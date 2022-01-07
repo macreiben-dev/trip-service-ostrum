@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using TripServiceKata.Exception;
 using TripServiceKata.User;
 
@@ -6,31 +7,46 @@ namespace TripServiceKata.Trip
 {
     public class TripService
     {
-        public List<Trip> GetTripsByUser(User.User user)
+        private readonly ITripDao tripDao;
+
+        public TripService(ITripDao tripDao)
         {
-            List<Trip> tripList = new List<Trip>();
-            User.User loggedUser = UserSession.GetInstance().GetLoggedUser();
-            bool isFriend = false;
-            if (loggedUser != null)
+            this.tripDao = tripDao;
+        }
+
+        public List<Trip> GetTripsByUser(TripServiceKata.User.User user)
+        {
+            User.User loggedUser = GetLoggedUser() ?? throw new UserNotLoggedInException();
+
+            if (user.GetFriends().Any(c => c.Equals(loggedUser)))
             {
-                foreach(User.User friend in user.GetFriends())
-                {
-                    if (friend.Equals(loggedUser))
-                    {
-                        isFriend = true;
-                        break;
-                    }
-                }
-                if (isFriend)
-                {
-                    tripList = TripDAO.FindTripsByUser(user);
-                }
-                return tripList;
+                return tripDao.FindTripsByUser(user);
             }
-            else
-            {
-                throw new UserNotLoggedInException();
-            }
+
+            return Empty();
+        }
+
+        private static List<Trip> Empty()
+        {
+            return new List<Trip>();
+        }
+
+        protected virtual TripServiceKata.User.User GetLoggedUser()
+        {
+            return UserSession.GetInstance().GetLoggedUser();
+        }
+    }
+
+    public interface ITripDao
+    {
+        List<Trip> FindTripsByUser(User.User user);
+    }
+
+    public class TripDaoAdapter : ITripDao
+    {
+        public List<Trip> FindTripsByUser(User.User user)
+        {
+            return TripDAO.FindTripsByUser(user);
         }
     }
 }
